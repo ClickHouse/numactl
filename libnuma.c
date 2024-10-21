@@ -427,7 +427,7 @@ done:
 		nodemask_sz = 16;
 		do {
 			nodemask_sz <<= 1;
-			mask = realloc(mask, nodemask_sz / 8);
+			mask = realloc(mask, nodemask_sz / 8 + sizeof(unsigned long));
 			if (!mask)
 				return;
 		} while (get_mempolicy(&pol, mask, nodemask_sz + 1, 0, 0) < 0 && errno == EINVAL &&
@@ -627,9 +627,12 @@ set_preferred_many(void)
 {
 	int oldp;
 	struct bitmask *bmp, *tmp;
+	int old_errno;
 
 	if (has_preferred_many >= 0)
 		return;
+
+	old_errno = errno;
 
 	has_preferred_many = 0;
 
@@ -650,6 +653,7 @@ set_preferred_many(void)
 out:
 	numa_bitmask_free(tmp);
 	numa_bitmask_free(bmp);
+	errno = old_errno;
 }
 
 /*
@@ -867,7 +871,7 @@ long numa_node_size(int node, long *freep)
 
 int numa_available(void)
 {
-	if (get_mempolicy(NULL, NULL, 0, 0, 0) < 0 && errno == ENOSYS)
+	if (get_mempolicy(NULL, NULL, 0, 0, 0) < 0 && (errno == ENOSYS || errno == EPERM))
 		return -1;
 	return 0;
 }
