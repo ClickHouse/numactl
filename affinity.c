@@ -324,7 +324,7 @@ static struct handler {
 	{}
 };
 
-int resolve_affinity(const char *id, struct bitmask *mask)
+hidden int resolve_affinity(const char *id, struct bitmask *mask)
 {
 	struct handler *h;
 
