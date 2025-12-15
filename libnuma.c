@@ -1915,7 +1915,7 @@ int numa_preferred(void)
 	bmp = __numa_preferred();
 	first_node = numa_find_first(bmp);
 	numa_bitmask_free(bmp);
-	
+
 	return first_node;
 }
 
@@ -2017,131 +2017,6 @@ static unsigned long get_nr(const char *s, char **end, struct bitmask *bmp, int 
 		if (numa_bitmask_isbitset(bmp, i))
 			nr--;
 	return i-1;
-}
-
-/*
- * __numa_parse_nodestring() is called to create a node mask, given
- * an ascii string such as 25 or 12-15 or 1,3,5-7 or +6-10.
- * (the + indicates that the numbers are nodeset-relative)
- *
- * The nodes may be specified as absolute, or relative to the current nodeset.
- * The list of available nodes is in a map pointed to by "allowed_nodes_ptr",
- * which may represent all nodes or the nodes in the current nodeset.
- *
- * The caller must free the returned bitmask.
- */
-static struct bitmask *
-__numa_parse_nodestring(const char *s, struct bitmask *allowed_nodes_ptr)
-{
-	int invert = 0, relative = 0;
-	int conf_nodes = numa_num_configured_nodes();
-	char *end;
-	struct bitmask *mask;
-
-	mask = numa_allocate_nodemask();
-	if (!mask)
-		return NULL;
-
-	if (s[0] == 0){
-		copy_bitmask_to_bitmask(numa_no_nodes_ptr, mask);
-		return mask; /* return freeable mask */
-	}
-	if (*s == '!') {
-		invert = 1;
-		s++;
-	}
-	if (*s == '+') {
-		relative++;
-		s++;
-	}
-	do {
-		unsigned long arg;
-		int i;
-		if (isalpha(*s)) {
-			int n;
-			if (!strcmp(s,"all")) {
-				copy_bitmask_to_bitmask(allowed_nodes_ptr,
-							mask);
-				s+=4;
-				break;
-			}
-			n = resolve_affinity(s, mask);
-			if (n != NO_IO_AFFINITY) {
-				if (n < 0)
-					goto err;
-				s += strlen(s) + 1;
-				break;
-			}
-		}
-		arg = get_nr(s, &end, allowed_nodes_ptr, relative);
-		if (end == s) {
-			numa_warn(W_nodeparse, "unparseable node description `%s'\n", s);
-			goto err;
-		}
-		if (!numa_bitmask_isbitset(allowed_nodes_ptr, arg)) {
-			numa_warn(W_nodeparse, "node argument %ld is out of range\n", arg);
-			goto err;
-		}
-		i = arg;
-		numa_bitmask_setbit(mask, i);
-		s = end;
-		if (*s == '-') {
-			char *end2;
-			unsigned long arg2;
-			arg2 = get_nr(++s, &end2, allowed_nodes_ptr, relative);
-			if (end2 == s) {
-				numa_warn(W_nodeparse, "missing node argument %s\n", s);
-				goto err;
-			}
-			if (!numa_bitmask_isbitset(allowed_nodes_ptr, arg2)) {
-				numa_warn(W_nodeparse, "node argument %ld out of range\n", arg2);
-				goto err;
-			}
-			while (arg <= arg2) {
-				i = arg;
-				if (numa_bitmask_isbitset(allowed_nodes_ptr,i))
-					numa_bitmask_setbit(mask, i);
-				arg++;
-			}
-			s = end2;
-		}
-	} while (*s++ == ',');
-	if (s[-1] != '\0')
-		goto err;
-	if (invert) {
-		int i;
-		for (i = 0; i < conf_nodes; i++) {
-			if (numa_bitmask_isbitset(mask, i))
-				numa_bitmask_clearbit(mask, i);
-			else
-				numa_bitmask_setbit(mask, i);
-		}
-	}
-	return mask;
-
-err:
-	numa_bitmask_free(mask);
-	return NULL;
-}
-
-/*
- * numa_parse_nodestring() is called to create a bitmask from nodes available
- * for this task.
- */
-
-struct bitmask * numa_parse_nodestring(const char *s)
-{
-	return __numa_parse_nodestring(s, numa_all_nodes_ptr);
-}
-
-/*
- * numa_parse_nodestring_all() is called to create a bitmask from all nodes
- * available.
- */
-
-struct bitmask * numa_parse_nodestring_all(const char *s)
-{
-	return __numa_parse_nodestring(s, numa_possible_nodes_ptr);
 }
 
 /*
